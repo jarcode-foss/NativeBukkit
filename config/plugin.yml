@@ -1,0 +1,5 @@
+name: NativeBukkit
+load: STARTUP
+version: ${project.version}
+author: Jarcode
+main: ca.jarcode.nativebukkit.NativeBukkit
