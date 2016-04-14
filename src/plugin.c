@@ -18,7 +18,8 @@
 
 /* pl: JNIPlugin implementation */
 
-#define MSTRING(x) #x
+#define STRING(x) #x
+#define MSTRING(x) STRING(x)
 
 static jclass type;
 static jfieldID id_internal;
@@ -33,17 +34,20 @@ static jfieldID id_name;
     JU_NULL
 };
 
-JNIEXPORT JNICALL jlong Java_jni_JNIPlugin_open(JNIEnv* env, jobject jstr) {
+JNIEXPORT JNICALL jlong Java_jni_JNIPlugin_open(JNIEnv* env, jclass type, jstring jstr) {
+    if (!jstr) goto badarg;
     const char* str = (*env)->GetStringUTFChars(env, jstr, NULL);
-    ASSERTEX(env);
+    if (!str) goto badarg;
     void* handle;
-    if ((handle = dlopen(str, RTLD_LAZY))) {
+    if (!(handle = dlopen(str, RTLD_LAZY))) {
         ju_throwf(env, "dlopen() failed: %s", dlerror());
         handle = NULL;
-    }
+    } else nb_logf(&nb_stub, "obtained handle for at %p", str, handle);
     (*env)->ReleaseStringUTFChars(env, jstr, str);
-    ASSERTEX(env);
     return (jlong) (intptr_t) handle;
+ badarg:
+    ju_throw(env, "cannot make call to dlopen() with NULL argument");
+    return 0;
 }
 
 JNIEXPORT JNICALL void Java_jni_JNIPlugin_onLoad(JNIEnv* env, jobject this) {
@@ -67,11 +71,11 @@ JNIEXPORT JNICALL void Java_jni_JNIPlugin_onLoad(JNIEnv* env, jobject this) {
     if ((err = dlerror())) goto ex;
     
     sw_barrier(); /* aliasing */
-    self->load((nb_state*) self, &nb_api);
+    self->load((nb_state*) self, &nb_global_api);
     
     return;
  ex:
-    ju_throwf(env, "dlsym() failed: ", err);
+    ju_throwf(env, "dlsym() failed (%p): %s", handle, err);
 }
 
 JNIEXPORT JNICALL void Java_jni_JNIPlugin_onEnable(JNIEnv* env, jobject this) {
@@ -92,9 +96,11 @@ JNIEXPORT JNICALL void Java_jni_JNIPlugin_close(JNIEnv* env, jobject this) {
     ASSERTEX(env);
     if (dlclose(handle)) {
         ju_throwf(env, "dlclose() failed (%p): %s:", handle, dlerror());
+        return;
     }
     if (self) {
         free(self);
         (*env)->SetLongField(env, this, id_internal, (jlong) 0);
+        ASSERTEX(env);
     }
 }

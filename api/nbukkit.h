@@ -4,7 +4,11 @@
 #ifndef NBUKKIT_H
 #define NBUKKIT_H
 
+#ifdef __cplusplus
+#define NB_API extern "C" __attribute__ ((visibility("default")))
+#else
 #define NB_API __attribute__ ((visibility("default")))
+#endif
 #define NB_SYM NB_API __attribute__ ((noinline))
 
 #define NB_ENABLE_SYM nb_enable_hook
@@ -13,7 +17,7 @@
 
 #define NB_ENABLE_DEF(arg) NB_SYM void NB_ENABLE_SYM (nb_state* arg)
 #define NB_DISABLE_DEF(arg) NB_SYM void NB_DISABLE_SYM (nb_state* arg)
-#define NB_LOAD_DEF(arg) NB_SYM void NB_LOAD_SYM (nb_state* arg, nb* api)
+#define NB_LOAD_DEF(arg, api) NB_SYM void NB_LOAD_SYM (nb_state* arg, nb_api* api)
 
 /* exception state */
 typedef struct {
@@ -46,10 +50,10 @@ typedef struct {
         /* returns NULL if not backed by a craftbukkit/spigot server */
         void* (*java_env) (nb_state* state);
     } unsafe;
-} nb;
+} nb_api;
 
 typedef void (*nb_fenable) (nb_state*);
 typedef void (*nb_fdisable) (nb_state*);
-typedef void (*nb_fload) (nb_state*, nb* api);
+typedef void (*nb_fload) (nb_state*, nb_api* api);
 
 #endif /* NBUKKIT_H */

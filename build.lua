@@ -29,7 +29,7 @@ default("COMPILER", "gcc")
 -- if you are compiling for your own system, use -march=native
 default("COMPILER_CFLAGS", "-m64")
 default("COMPILER_ARGS", "-Wall -Werror -fPIC -O2 " .. COMPILER_CFLAGS)
-default("COMPILER_DEBUG_ARGS", "-Wall -Wextra -fPIC -ggdb " .. COMPILER_CFLAGS)
+default("COMPILER_DEBUG_ARGS", "-Wall -Wextra -fPIC -O0 -ggdb3 -DJU_DEBUG " .. COMPILER_CFLAGS)
 default("COMPILER_OUTFLAG", "-o")
 default("COMPILER_INCLUDEFLAG", "-I")
 default("COMPILER_SKIP_LINK", "-c")
@@ -41,7 +41,14 @@ default("LINKER_OUTFLAG", "-o")
 default("LINKER_LIBRARYFLAG", "-l")
 
 -- symbols to preserve when stripping the final executable
-default("PRESERVE_SYMBOLS", {})
+default("PRESERVE_SYMBOLS", {
+            "Java_jni_JNIEntry_entry",
+            "Java_jni_JNIPlugin_onLoad",
+            "Java_jni_JNIPlugin_onEnable",
+            "Java_jni_JNIPlugin_onDisable",
+            "Java_jni_JNIPlugin_close",
+            "Java_jni_JNIPlugin_open"
+})
 -- whether to strip all symbols, or only strip uneeded symbols
 default("AGGRESSIVE_STRIP", true)
 
@@ -153,18 +160,19 @@ goals = {
                     end
                 end
                 local parts = nil
+                if debug_mode == true then COMPILER_ARGS = COMPILER_DEBUG_ARGS end
                 if ext == ".c" and IHEADERS then
                     parts = {
                         "iheaders", "-p", "-O", entry.full, "|",
-                        COMPILER, debug_mode == true and COMPIELR_DEBUG_ARGS or COMPILER_ARGS,
-                        genstr, COMPILER_INCLUDEFLAG, "\"" .. SOURCES .. "\"", COMPILER_OUTFLAG,
+                        COMPILER, COMPILER_ARGS, genstr,
+                        COMPILER_INCLUDEFLAG, "\"" .. SOURCES .. "\"", COMPILER_OUTFLAG,
                         OUTPUTS .. entry.path .. "/" .. entry.filen .. ".o",
                         COMPILER_SKIP_LINK, COMPILER_LANG_FLAG, "c", "-"
                     }
                 else
                     parts = {
-                        COMPILER, debug_mode == true and COMPIELR_DEBUG_ARGS or COMPILER_ARGS,
-                        genstr, COMPILER_INCLUDEFLAG, "\"" .. SOURCES .. "\"",
+                        COMPILER, COMPILER_ARGS, genstr,
+                        COMPILER_INCLUDEFLAG, "\"" .. SOURCES .. "\"",
                         entry.full, COMPILER_OUTFLAG,
                         OUTPUTS .. entry.path .. "/" .. entry.filen .. ".o",
                         COMPILER_SKIP_LINK

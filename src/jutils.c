@@ -15,11 +15,9 @@
 static jclass exclass;
 
 @ {
-    #define JU_DEBUG 0
-    
-    #if JU_DEBUG >= 1
+    #ifdef JU_DEBUG
     #define ASSERTEX(e) \
-        do { if ((*e)->ExceptionCheck(e) == JNI_TRUE) { ju_afatal(e, __func__ ":" __LINE__); } } while (0)
+        do { if ((*e)->ExceptionCheck(e) == JNI_TRUE) { ju_afatal(e, __func__, __LINE__); } } while (0)
     #else
     #define ASSERTEX(e) do {} while (0)
     #endif
@@ -49,8 +47,8 @@ static jclass exclass;
    always stop the current API call, and then set the error state accordingly for a plugin's nb_state */
 
 /* fatal error from ASSERTEX, expects a pending exception */
-@(__attribute__ ((noreturn))) void ju_afatal(JNIEnv* env, char* info) {
-    nb_logf(NULL, "JNI Assertion failed (%s)", info);
+@(__attribute__ ((noreturn))) void ju_afatal(JNIEnv* env, const char* func, int line) {
+    nb_logf(NULL, "JNI Assertion failed (%s:%d)", func, line);
     (*env)->ExceptionDescribe(env);
     abort();
 }

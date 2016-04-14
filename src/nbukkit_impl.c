@@ -28,7 +28,7 @@ static void* unsafe_jenv(nb_state* state) {
 
 @(extern) nb_state nb_stub = { .name = "loader" };
 
-@(extern) nb nb_api = {
+@(extern) nb_api nb_global_api = {
     .logf = &nb_logf,
     .log = &nb_log,
     .alloc = &nb_alloc,
@@ -51,11 +51,10 @@ static void* unsafe_jenv(nb_state* state) {
     struct tm spec;
     localtime_r(&raw, &spec);
     size_t off = strftime(buf, sizeof(buf) - 1, "[" LOG_TIMEFORMAT "]", &spec);
-    off += (size_t) snprintf(buf + off, sizeof(buf) - (off + 1), "[N:%s] ",
+    off += snprintf(buf + off, sizeof(buf) - (off + 1), "[N:%s] ",
                              state ? state->name : "!");
-    off += (size_t) vsnprintf(buf + off, sizeof(buf) - (off + 1), format, argptr);
+    off += vsnprintf(buf + off, sizeof(buf) - (off + 1), format, argptr);
     va_end(argptr);
-    buf[off] = '\0';
     fputs(buf, state ? stdout : stderr);
     fputc('\n', state ? stdout : stderr);
 }
@@ -66,11 +65,10 @@ static void* unsafe_jenv(nb_state* state) {
     time(&raw);
     struct tm spec;
     localtime_r(&raw, &spec);
-    size_t off = strftime(buf, sizeof(buf) - 1, "[" LOG_TIMEFORMAT "]", &spec);
-    off += (size_t) snprintf(buf + off, sizeof(buf) - (off + 1), "[N:%s] ",
+    size_t off = strftime(buf, sizeof(buf) - 1, "[" LOG_TIMEFORMAT , &spec);
+    off += (size_t) snprintf(buf + off, sizeof(buf) - (off + 1), " N:%s] ",
                              state ? state->name : "!");
-    off += (size_t) strncpy(buf + off, info, sizeof(buf) - (off + 1));
-    buf[off] = '\0';
+    strncpy(buf + off, info, sizeof(buf) - (off + 1));
     fputs(buf, stdout ? stdout : stderr);
     fputc('\n', stdout ? stdout : stderr);
 }

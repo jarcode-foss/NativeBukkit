@@ -23,12 +23,17 @@ public class NativeBukkit extends JavaPlugin {
 	
 	private static final String NATIVE_LIBRARY = "nativebukkit.so";
 	private static boolean LOADED_NATIVES = false;
-
 	private static Loader LOADER;
+	private static final boolean INIT_ON_STARTUP = false; /* disable for debugging init */
+	private static NativeBukkit instance;
+
+	private final Logger b = Bukkit.getLogger();
+	
+	{ instance = this; }
 	
 	public void onEnable() {
-		File result = null;
 		if (!LOADED_NATIVES) {
+			File result = null;
 			InputStream stream = null;
 			try {
 				stream = this.getClass().getClassLoader().getResourceAsStream(NATIVE_LIBRARY);
@@ -50,17 +55,29 @@ public class NativeBukkit extends JavaPlugin {
 					} catch (Throwable ignored) {}
 				}
 			}
+			System.load(result.getAbsolutePath());
 			LOADED_NATIVES = true;
+			new JNIEntry(this).entry();
+			/* Provide a simple loader for native plugins */
+			Bukkit.getPluginManager().registerInterface(Loader.class);
+			/* Load native plugins through the plugin manager */
+			for (File f : getFile().getParentFile().listFiles()) {
+				if (!f.isDirectory() && f.getName().endsWith(".so")) {
+					try {
+						b.info(String.format("Loading native plugin '%s'...", f.getName()));
+						Plugin plugin = Bukkit.getPluginManager().loadPlugin(f);
+						Bukkit.getPluginManager().enablePlugin(plugin);
+					} catch (InvalidPluginException | InvalidDescriptionException e) {
+						e.printStackTrace();
+					}
+				}
+			}
 		}
-		System.load(result.getAbsolutePath());
-		new JNIEntry(this).entry();
-		/* Provide a simpler loader for native plugins */
-		Bukkit.getPluginManager().registerInterface(Loader.class);
 	}
 
 	/* Native plugin loader, ignores traditional listener registration and provides stub descriptions */
-	public class Loader implements PluginLoader {
-		Loader(Server server) { LOADER = this; }
+	public static class Loader implements PluginLoader {
+		public Loader(Server server) {}
 		public Map<Class<? extends Event>, Set<RegisteredListener>>
 			createRegisteredListeners(Listener listener, Plugin plugin) {
 			throw new RuntimeException("Cannot register listener classes for native plugins");
@@ -72,25 +89,28 @@ public class NativeBukkit extends JavaPlugin {
 		}
 		public Pattern[] getPluginFileFilters() { return new Pattern[] { Pattern.compile("\\.so$") }; }
 		public Plugin loadPlugin(File file) {
-			NativePlugin plugin = new NativePlugin(file, JNIPlugin.open(file.getAbsolutePath()));
-			plugin.onLoad();
-			return plugin;
+			return new NativePlugin(file, this, JNIPlugin.open(file.getAbsolutePath()));
 		}
 	}
 	
 	/* Plugin implementation for native libraries */
 	/* Most of the implementations in this class are stubs */
-	public class NativePlugin implements Plugin {
+	public static class NativePlugin implements Plugin {
 		private boolean enabled = false;
 		private final File lib;
 		private final JNIPlugin plugin;
-		public NativePlugin(File lib, long handle) {
+		private final Loader loader;
+		private NativePlugin(File lib, Loader loader, long handle) {
 			this.lib = lib;
+			this.loader = loader;
 			plugin = new JNIPlugin(handle, this);
+			plugin.onLoad();
 		}
 		public FileConfiguration getConfig() { return null; } /* ignore */
 		public com.avaje.ebean.EbeanServer getDatabase() { return null; } /* stub */
-		public File getDataFolder() { return NativeBukkit.this.getFile().getParentFile(); }
+		public File getDataFolder() {
+			return new File(instance.getFile().getParentFile(), getName().split(".")[0]);
+		}
 		public ChunkGenerator getDefaultWorldGenerator(String worldName, String id) { return null; }
 		/* native plugins don't include any extra information */
 		public PluginDescriptionFile getDescription() {
@@ -98,7 +118,7 @@ public class NativeBukkit extends JavaPlugin {
 		}
 		public Logger getLogger() { return Bukkit.getLogger(); } /* never used */
 		public String getName() { return lib.getName(); }
-		public PluginLoader getPluginLoader() { return LOADER; }
+		public PluginLoader getPluginLoader() { return loader; }
 		public InputStream getResource(String filename) { return null; } /* never used */
 		public Server getServer() { return Bukkit.getServer(); }
 		public boolean isEnabled() { return enabled; }
