@@ -22,12 +22,27 @@
     } nb_istate;
 }
 
+static void* unsafe_jenv(nb_state* state) {
+    return ((nb_istate*) state)->env;
+}
+
 @(extern) nb_state nb_stub = { .name = "loader" };
+
+@(extern) nb nb_api = {
+    .logf = &nb_logf,
+    .log = &nb_log,
+    .alloc = &nb_alloc,
+    .realloc = &nb_realloc,
+    .free = &nb_free,
+    .unsafe = {
+        .java_env = &unsafe_jenv
+    }
+};
 
 #define LOG_BUFSIZE 1024
 #define LOG_TIMEFORMAT "%H:%M:%S"
 
-void nb_logf(nb_state* state, const char* format, ...) {
+@() void nb_logf(nb_state* state, const char* format, ...) {
     va_list argptr;
     va_start(argptr, format);
     char buf[LOG_BUFSIZE];
@@ -45,7 +60,7 @@ void nb_logf(nb_state* state, const char* format, ...) {
     fputc('\n', state ? stdout : stderr);
 }
 
-void nb_log(nb_state* state, const char* info) {
+@() void nb_log(nb_state* state, const char* info) {
     char buf[LOG_BUFSIZE];
     time_t raw;
     time(&raw);
@@ -65,7 +80,7 @@ void nb_log(nb_state* state, const char* info) {
   with its own heap (checked mmap syscalls?)
 */
 
-void* nb_alloc(nb_state* state, size_t size) {
+@() void* nb_alloc(nb_state* state, size_t size) {
     void* ret;
     if (!(ret = malloc(size))) {
         nb_logf(NULL, "failed to allocate %n bytes", (int) size);
@@ -74,7 +89,7 @@ void* nb_alloc(nb_state* state, size_t size) {
     return ret;
 }
 
-void* nb_realloc(nb_state* state, void* ptr, size_t size) {
+@() void* nb_realloc(nb_state* state, void* ptr, size_t size) {
     void* ret;
     if (!(ret = realloc(ptr, size))) {
         nb_logf(NULL, "failed to re-allocate %n bytes at %p", (int) size, ptr);
@@ -83,6 +98,6 @@ void* nb_realloc(nb_state* state, void* ptr, size_t size) {
     return ret;
 }
 
-void nb_free(nb_state* state, void* ptr) {
+@() void nb_free(nb_state* state, void* ptr) {
     return free(ptr);
 }

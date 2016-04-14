@@ -50,8 +50,11 @@ JNIEXPORT JNICALL void Java_jni_JNIPlugin_onLoad(JNIEnv* env, jobject this) {
     nb_istate* self = smalloc(sizeof(nb_istate));
 
     jstring jstr = (*env)->GetObjectField(env, this, id_name);
+    ASSERTEX(env);
     *((const char**) &self->name) = (*env)->GetStringUTFChars(env, jstr, NULL);
     self->env = env;
+    (*env)->SetLongField(env, this, id_internal, (jlong) (intptr_t) self);
+    ASSERTEX(env);
     
     void* handle = (void*) (intptr_t) (*env)->GetLongField(env, this, id_handle);
     ASSERTEX(env);
@@ -64,7 +67,7 @@ JNIEXPORT JNICALL void Java_jni_JNIPlugin_onLoad(JNIEnv* env, jobject this) {
     if ((err = dlerror())) goto ex;
     
     sw_barrier(); /* aliasing */
-    self->load((nb_state*) self);
+    self->load((nb_state*) self, &nb_api);
     
     return;
  ex:
@@ -72,17 +75,26 @@ JNIEXPORT JNICALL void Java_jni_JNIPlugin_onLoad(JNIEnv* env, jobject this) {
 }
 
 JNIEXPORT JNICALL void Java_jni_JNIPlugin_onEnable(JNIEnv* env, jobject this) {
-    
+    nb_istate* self = (nb_istate*) (intptr_t) (*env)->GetLongField(env, this, id_internal);
+    ASSERTEX(env);
+    self->enable((nb_state*) self);
 }
 
 JNIEXPORT JNICALL void Java_jni_JNIPlugin_onDisable(JNIEnv* env, jobject this) {
-    
+    nb_istate* self = (nb_istate*) (intptr_t) (*env)->GetLongField(env, this, id_internal);
+    ASSERTEX(env);
+    self->disable((nb_state*) self);
 }
 
 JNIEXPORT JNICALL void Java_jni_JNIPlugin_close(JNIEnv* env, jobject this) {
+    nb_istate* self = (nb_istate*) (intptr_t) (*env)->GetLongField(env, this, id_internal);
     void* handle = (void*) (intptr_t) (*env)->GetLongField(env, this, id_handle);
     ASSERTEX(env);
     if (dlclose(handle)) {
         ju_throwf(env, "dlclose() failed (%p): %s:", handle, dlerror());
+    }
+    if (self) {
+        free(self);
+        (*env)->SetLongField(env, this, id_internal, (jlong) 0);
     }
 }

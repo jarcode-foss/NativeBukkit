@@ -1,5 +1,5 @@
 
-/* Core NativeBukkit definitions and macros */
+/* Core NativeBukkit type definitions and macros */
 
 #ifndef NBUKKIT_H
 #define NBUKKIT_H
@@ -13,7 +13,7 @@
 
 #define NB_ENABLE_DEF(arg) NB_SYM void NB_ENABLE_SYM (nb_state* arg)
 #define NB_DISABLE_DEF(arg) NB_SYM void NB_DISABLE_SYM (nb_state* arg)
-#define NB_LOAD_DEF(arg) NB_SYM void NB_LOAD_SYM (nb_state* arg)
+#define NB_LOAD_DEF(arg) NB_SYM void NB_LOAD_SYM (nb_state* arg, nb* api)
 
 /* exception state */
 typedef struct {
@@ -29,16 +29,27 @@ typedef struct {
     NB_STATE_MEMBERS
 } nb_state;
 
+/* primary API interface, static once handed to plugin in enable() */
+typedef struct {
+    /* logging functions; these do not interact with Bukkit's logging */
+    void (*logf)      (nb_state* state, const char* format, ...);
+    void (*log)       (nb_state* state, const char* info);
+
+    /* managed allocation functions (stubs) */
+    void* (*alloc)    (nb_state* state, size_t size);
+    void* (*realloc)  (nb_state* state, void* ptr, size_t size);
+    void  (*free)     (nb_state* state, void* ptr);
+
+    /* unsafe functions */
+    struct {
+        /* function to obtain JNIEnv* pointer for main server thread */
+        /* returns NULL if not backed by a craftbukkit/spigot server */
+        void* (*java_env) (nb_state* state);
+    } unsafe;
+} nb;
+
 typedef void (*nb_fenable) (nb_state*);
 typedef void (*nb_fdisable) (nb_state*);
-typedef void (*nb_fload) (nb_state*);
-
-/* logging functions; these do not interact with Bukkit's logging */
-NB_API void nb_logf(nb_state* state, const char* format, ...);
-NB_API void nb_log(nb_state* state, const char* info);
-
-NB_API void* nb_alloc(nb_state* state, size_t size);
-NB_API void* nb_realloc(nb_state* state, void* ptr, size_t size);
-NB_API void nb_free(nb_state*, void* ptr);
+typedef void (*nb_fload) (nb_state*, nb* api);
 
 #endif /* NBUKKIT_H */
