@@ -288,25 +288,11 @@ function error(message, level)
     __error("aborting...", 2)
 end
 
-function printc(message, c)
-    print(c .. message .. TERM_RESET)
-end
-
-function printb(message, c)
-    print(TERM_BOLD .. c .. message .. TERM_RESET)
-end
-
-function printcmd(cmd)
-    print(TERM_BOLD .. "-> " .. TERM_RESET .. TERM_CMD .. cmd .. TERM_RESET)
-end
-
-function writec(message, c)
-    io.write(c .. message .. TERM_RESET) 
-end
-
-function writeb(message, c)
-    io.write(TERM_BOLD .. c .. message .. TERM_RESET)
-end
+function printc(message, c) print(c .. message .. TERM_RESET) end
+function printb(message, c) print(TERM_BOLD .. c .. message .. TERM_RESET) end
+function writec(message, c) io.write(c .. message .. TERM_RESET) end
+function writeb(message, c) io.write(TERM_BOLD .. c .. message .. TERM_RESET) end
+function printcmd(cmd) print(TERM_BOLD .. "-> " .. TERM_RESET .. TERM_CMD .. cmd .. TERM_RESET) end
 
 -- assert programs exist
 function prereq(tbl)

@@ -4,8 +4,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <hooks.h>
+#include <nbukkit_impl.h>
 
 /* entry JNI function called when this library is loaded */
 JNIEXPORT void JNICALL Java_jni_JNIEntry_entry(JNIEnv* env, jobject this) {
-    puts("\n[C] initializing...\n");
+    nb_log(&nb_stub, "initializing...");
+    hk_resolveall(env);
 }

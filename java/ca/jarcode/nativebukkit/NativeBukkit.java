@@ -59,7 +59,7 @@ public class NativeBukkit extends JavaPlugin {
 	}
 
 	/* Native plugin loader, ignores traditional listener registration and provides stub descriptions */
-	private class Loader implements PluginLoader {
+	public class Loader implements PluginLoader {
 		Loader(Server server) { LOADER = this; }
 		public Map<Class<? extends Event>, Set<RegisteredListener>>
 			createRegisteredListeners(Listener listener, Plugin plugin) {
@@ -80,13 +80,13 @@ public class NativeBukkit extends JavaPlugin {
 	
 	/* Plugin implementation for native libraries */
 	/* Most of the implementations in this class are stubs */
-	private class NativePlugin implements Plugin {
+	public class NativePlugin implements Plugin {
 		private boolean enabled = false;
 		private final File lib;
 		private final JNIPlugin plugin;
 		public NativePlugin(File lib, long handle) {
 			this.lib = lib;
-			plugin = new JNIPlugin(handle);
+			plugin = new JNIPlugin(handle, this);
 		}
 		public FileConfiguration getConfig() { return null; } /* ignore */
 		public com.avaje.ebean.EbeanServer getDatabase() { return null; } /* stub */
