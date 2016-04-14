@@ -23,11 +23,11 @@ static jclass exclass;
     #else
     #define ASSERTEX(e) do {} while (0)
     #endif
-
+    
     #define CHECKEX(e, b) do { if ((*e)->ExceptionCheck(e) == JNI_TRUE) { goto b; } } while (0)
-
+    
     #define JU_NULL { NULL, NULL, NULL, NONE }
-
+    
     typedef enum {
         JU_CLASS, JU_METHOD, JU_STATIC_METHOD, JU_FIELD, NONE
     } ju_hooktype;

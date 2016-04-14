@@ -47,11 +47,7 @@ JNIEXPORT JNICALL jlong Java_jni_JNIPlugin_open(JNIEnv* env, jobject jstr) {
 }
 
 JNIEXPORT JNICALL void Java_jni_JNIPlugin_onLoad(JNIEnv* env, jobject this) {
-    nb_istate* self;
-    if (!(self = malloc(sizeof(nb_istate)))) {
-        ju_throwf(env, "failed to allocate %d bytes for nb_istate", sizeof(nb_istate));
-        return;
-    }
+    nb_istate* self = smalloc(sizeof(nb_istate));
 
     jstring jstr = (*env)->GetObjectField(env, this, id_name);
     *((const char**) &self->name) = (*env)->GetStringUTFChars(env, jstr, NULL);
