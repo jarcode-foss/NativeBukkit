@@ -8,7 +8,7 @@ NativeBukkit is two things:
 
 - a version of the Bukkit API extended in pure C, allowing developers to write plugins in native code using NativeBukkit's header files.
 
-Because NativeBukkit only works with ELF dynamic libraries, Linux and BSD will be the only supported platform. I don't care about your proprietary platform.
+Because NativeBukkit only works with ELF dynamic libraries (`.so`), Linux and BSD will be the only supported platforms. I don't care about your proprietary platform.
 
 ### Performance
 

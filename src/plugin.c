@@ -52,7 +52,7 @@ JNIEXPORT JNICALL jlong Java_jni_JNIPlugin_open(JNIEnv* env, jclass type, jstrin
 
 JNIEXPORT JNICALL void Java_jni_JNIPlugin_onLoad(JNIEnv* env, jobject this) {
     nb_istate* self = smalloc(sizeof(nb_istate));
-
+    
     jstring jstr = (*env)->GetObjectField(env, this, id_name);
     ASSERTEX(env);
     *((const char**) &self->name) = (*env)->GetStringUTFChars(env, jstr, NULL);
@@ -63,31 +63,44 @@ JNIEXPORT JNICALL void Java_jni_JNIPlugin_onLoad(JNIEnv* env, jobject this) {
     void* handle = (void*) (intptr_t) (*env)->GetLongField(env, this, id_handle);
     ASSERTEX(env);
     char* err;
+    int compat_version = *(int*) dlsym(handle, MSTRING(NB_VERSION_SYM));
+    if ((err = dlerror()))
+        goto dlsym_fail;
+    if ((compat_version != NB_COMPAT_VERSION))
+        goto version_mismatch;
     self->enable = dlsym(handle, MSTRING(NB_ENABLE_SYM));
-    if ((err = dlerror())) goto ex;
+    if ((err = dlerror()))
+        goto dlsym_fail;
     self->disable = dlsym(handle, MSTRING(NB_DISABLE_SYM));
-    if ((err = dlerror())) goto ex;
+    if ((err = dlerror()))
+        goto dlsym_fail;
     self->load = dlsym(handle, MSTRING(NB_LOAD_SYM));
-    if ((err = dlerror())) goto ex;
+    if ((err = dlerror()))
+        goto dlsym_fail;
     
     sw_barrier(); /* aliasing */
     self->load((nb_state*) self, &nb_global_api);
     
     return;
- ex:
+ dlsym_fail:
     ju_throwf(env, "dlsym() failed (%p): %s", handle, err);
+    return;
+ version_mismatch:
+    ju_throwf(env, "bad API compatibility version (got %d, expected %d)",
+              compat_version, NB_COMPAT_VERSION);
+    return;
 }
 
 JNIEXPORT JNICALL void Java_jni_JNIPlugin_onEnable(JNIEnv* env, jobject this) {
     nb_istate* self = (nb_istate*) (intptr_t) (*env)->GetLongField(env, this, id_internal);
     ASSERTEX(env);
-    self->enable((nb_state*) self);
+    self->enable();
 }
 
 JNIEXPORT JNICALL void Java_jni_JNIPlugin_onDisable(JNIEnv* env, jobject this) {
     nb_istate* self = (nb_istate*) (intptr_t) (*env)->GetLongField(env, this, id_internal);
     ASSERTEX(env);
-    self->disable((nb_state*) self);
+    self->disable();
 }
 
 JNIEXPORT JNICALL void Java_jni_JNIPlugin_close(JNIEnv* env, jobject this) {

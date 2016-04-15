@@ -24,9 +24,8 @@ public class NativeBukkit extends JavaPlugin {
 	private static final String NATIVE_LIBRARY = "nativebukkit.so";
 	private static boolean LOADED_NATIVES = false;
 	private static Loader LOADER;
-	private static final boolean INIT_ON_STARTUP = false; /* disable for debugging init */
 	private static NativeBukkit instance;
-
+	
 	private final Logger b = Bukkit.getLogger();
 	
 	{ instance = this; }

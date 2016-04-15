@@ -9,6 +9,7 @@
 #include <jni_md.h>
 
 #include <jutils.h>
+#include <runnable.h>
 #include <nbukkit_impl.h>
 
 @ {
@@ -35,7 +36,8 @@ static void* unsafe_jenv(nb_state* state) {
     .realloc = &nb_realloc,
     .free = &nb_free,
     .unsafe = {
-        .java_env = &unsafe_jenv
+        .java_env = &unsafe_jenv,
+        .java_runnable = &jrn_new
     }
 };
 
@@ -73,6 +75,17 @@ static void* unsafe_jenv(nb_state* state) {
     fputc('\n', stdout ? stdout : stderr);
 }
 
+
+@() void nb_cmdreg(nb_state* state, const char* cmd, nb_cmdhandler handler) {
+    nb_istate* i = (nb_istate*) state;
+    //TODO: finish
+}
+
+@() void nb_lreg (nb_state* state, short type, short priority, void (*handle) (void*)) {
+    nb_istate* i = (nb_istate*) state;
+    //TODO: finish
+}
+
 /*
   These are currently checked wrappers for malloc/free, but ideally should be using a custom allocator
   with its own heap (checked mmap syscalls?)
@@ -80,7 +93,7 @@ static void* unsafe_jenv(nb_state* state) {
 
 @() void* nb_alloc(nb_state* state, size_t size) {
     void* ret;
-    if (!(ret = malloc(size))) {
+    if (!(ret = smalloc(size))) {
         nb_logf(NULL, "failed to allocate %n bytes", (int) size);
         ju_fatal(((nb_istate*) state)->env);
     }

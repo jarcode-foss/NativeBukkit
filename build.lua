@@ -47,7 +47,8 @@ default("PRESERVE_SYMBOLS", {
             "Java_jni_JNIPlugin_onEnable",
             "Java_jni_JNIPlugin_onDisable",
             "Java_jni_JNIPlugin_close",
-            "Java_jni_JNIPlugin_open"
+            "Java_jni_JNIPlugin_open",
+            "Java_jni_JNIRunnable_run
 })
 -- whether to strip all symbols, or only strip uneeded symbols
 default("AGGRESSIVE_STRIP", true)
