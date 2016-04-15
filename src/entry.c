@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <jutils.h>
+
 #include <hooks.h>
 #include <nbukkit_impl.h>
 

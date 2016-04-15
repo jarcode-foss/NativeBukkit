@@ -26,8 +26,6 @@ public class NativeBukkit extends JavaPlugin {
 	private static Loader LOADER;
 	private static NativeBukkit instance;
 	
-	private final Logger b = Bukkit.getLogger();
-	
 	{ instance = this; }
 	
 	public void onEnable() {
@@ -63,9 +61,7 @@ public class NativeBukkit extends JavaPlugin {
 			for (File f : getFile().getParentFile().listFiles()) {
 				if (!f.isDirectory() && f.getName().endsWith(".so")) {
 					try {
-						b.info(String.format("Loading native plugin '%s'...", f.getName()));
-						Plugin plugin = Bukkit.getPluginManager().loadPlugin(f);
-						Bukkit.getPluginManager().enablePlugin(plugin);
+						Bukkit.getPluginManager().enablePlugin(Bukkit.getPluginManager().loadPlugin(f));
 					} catch (InvalidPluginException | InvalidDescriptionException e) {
 						e.printStackTrace();
 					}
@@ -87,8 +83,13 @@ public class NativeBukkit extends JavaPlugin {
 			return new PluginDescriptionFile(file.getName(), "unknown", "native");
 		}
 		public Pattern[] getPluginFileFilters() { return new Pattern[] { Pattern.compile("\\.so$") }; }
-		public Plugin loadPlugin(File file) {
-			return new NativePlugin(file, this, JNIPlugin.open(file.getAbsolutePath()));
+		public Plugin loadPlugin(File file) throws InvalidPluginException {
+			Bukkit.getLogger().info(String.format("Loading native plugin '%s'...", file.getName()));
+			try {
+				return new NativePlugin(file, this, JNIPlugin.open(file.getAbsolutePath()));
+			} catch (NativeException e) {
+				throw new InvalidPluginException(e);
+			}
 		}
 	}
 	
@@ -124,17 +125,24 @@ public class NativeBukkit extends JavaPlugin {
 		public boolean isNaggable() { return false; } /* never used */
 		public void onDisable() {
 			if (enabled) {
+				Bukkit.getLogger().info(String.format("Disabling '%s'...", getName()));
 				plugin.onDisable();
 				enabled = false;
+				Bukkit.getLogger().info(String.format("'%s' has been disabled.", getName()));
 			}
 		}
 		public void onEnable() {
 			if (!enabled) {
+				Bukkit.getLogger().info(String.format("Enabling '%s'...", getName()));
 				plugin.onEnable();
 				enabled = true;
+				Bukkit.getLogger().info(String.format("'%s' has been enabled.", getName()));
 			}
 		}
-		public void onLoad() { plugin.onLoad(); }
+		public void onLoad() {
+			Bukkit.getLogger().info(String.format("Loaded '%s'.", getName()));
+			plugin.onLoad();
+		}
 		public void reloadConfig() {} /* ignore */
 		public void saveConfig() {} /* ignore */
 		public void saveDefaultConfig() {} /* ignore */

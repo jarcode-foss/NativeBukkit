@@ -2,13 +2,16 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <stdint.h>
 
 #include <time.h>
 
 #include <jni.h>
 #include <jni_md.h>
 
+#include <cutils.h>
 #include <jutils.h>
+
 #include <runnable.h>
 #include <nbukkit_impl.h>
 
@@ -17,32 +20,82 @@
     typedef struct {
         NB_STATE_MEMBERS
         JNIEnv* env;
+        jobject jplugin;
         nb_fenable enable;
         nb_fdisable disable;
         nb_fload load;
+        char exbuf[1024];
+        char namebuf[128];
     } nb_istate;
 }
+
+#define LOG_BUFSIZE 1024
+#define LOG_TIMEFORMAT "%H:%M:%S"
 
 static void* unsafe_jenv(nb_state* state) {
     return ((nb_istate*) state)->env;
 }
 
+static void* unsafe_jrunnable(nb_state* state, void* udata, void (*ptr) (void* udata)) {
+    return jrn_new(((nb_istate*) state)->env, udata, ptr);
+}
+
+@(extern) jclass nb_jbukkit;        /* org.bukkit.Bukkit */
+static jmethodID id_getsched;       /* static Bukkit#getScheduler() */
+
+static jclass class_jsched;         /* BukkitScheduler singleton */
+static jmethodID id_schedrepeating; /* BukkitScheduler#scheduleSyncRepeatingTask(...) */
+static jmethodID id_scheddelayed;   /* BukkitScheduler#scheduleSyncDelayedTask(...) */
+static jmethodID id_schedrm;        /* BukkitScheduler#cancelTask(id) */
+
+static jclass class_type;           /* java.lang.Class */
+static jmethodID id_getname;        /* Class#getName() */
+static jclass throwable_type;       /* java.lang.Throwable */
+static jmethodID id_getmessage;     /* Throwable#getMessage() */
+
+@(extern) ju_hook nb_hooks[] = {
+    { "org/bukkit/Bukkit", NULL, &nb_jbukkit, JU_CLASS },
+    { "getScheduler", "()Lorg/bukkit/scheduler/BukkitScheduler;", &id_getsched, JU_STATIC_METHOD },
+    
+    { "org/bukkit/scheduler/BukkitScheduler", "J", &class_jsched, JU_CLASS },
+    { "scheduleSyncRepeatingTask",
+      "(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;JJ)I", &id_schedrepeating, JU_METHOD },
+    { "scheduleSyncDelayedTask",
+      "(Lorg/bukkit/plugin/Plugin;Ljava/lang/Runnable;J)I", &id_scheddelayed, JU_METHOD },
+    { "cancelTask", "(I)V", &id_schedrm, JU_METHOD },
+    
+    { "java/lang/Class", NULL, &class_type, JU_CLASS },
+    { "getName", "()Ljava/lang/String;", &id_getname, JU_METHOD },
+    
+    { "java/lang/Throwable", NULL, &throwable_type, JU_CLASS },
+    { "getMessage", "()Ljava/lang/String;", &id_getmessage, JU_METHOD },
+    
+    JU_NULL
+};
+
 @(extern) nb_state nb_stub = { .name = "loader" };
 
 @(extern) nb_api nb_global_api = {
-    .logf = &nb_logf,
-    .log = &nb_log,
-    .alloc = &nb_alloc,
-    .realloc = &nb_realloc,
-    .free = &nb_free,
+    .logf = &nb_logf, .log = &nb_log,
+    
+    .alloc = &nb_alloc, .realloc = &nb_realloc, .free = &nb_free,
+    
+    .treg = &nb_treg, .tcancel = &nb_tcancel,
+    
     .unsafe = {
         .java_env = &unsafe_jenv,
-        .java_runnable = &jrn_new
+        .java_runnable = &unsafe_jrunnable,
+        .java_setex = &nb_setex
     }
 };
 
-#define LOG_BUFSIZE 1024
-#define LOG_TIMEFORMAT "%H:%M:%S"
+/* global references to singletons that are used in the bukkit API */
+@(extern) jobject nb_jsched = NULL;
+
+@() void nb_initsingletons(JNIEnv* e) {
+    nb_jsched = (*e)->NewGlobalRef(e, (*e)->CallStaticObjectMethod(e, nb_jbukkit, id_getsched));
+    ASSERTEX(e);
+}
 
 @() void nb_logf(nb_state* state, const char* format, ...) {
     va_list argptr;
@@ -52,8 +105,8 @@ static void* unsafe_jenv(nb_state* state) {
     time(&raw);
     struct tm spec;
     localtime_r(&raw, &spec);
-    size_t off = strftime(buf, sizeof(buf) - 1, "[" LOG_TIMEFORMAT "]", &spec);
-    off += snprintf(buf + off, sizeof(buf) - (off + 1), "[N:%s] ",
+    size_t off = strftime(buf, sizeof(buf) - 1, "[" LOG_TIMEFORMAT, &spec);
+    off += snprintf(buf + off, sizeof(buf) - (off + 1), " N:%s] ",
                              state ? state->name : "!");
     off += vsnprintf(buf + off, sizeof(buf) - (off + 1), format, argptr);
     va_end(argptr);
@@ -67,7 +120,7 @@ static void* unsafe_jenv(nb_state* state) {
     time(&raw);
     struct tm spec;
     localtime_r(&raw, &spec);
-    size_t off = strftime(buf, sizeof(buf) - 1, "[" LOG_TIMEFORMAT , &spec);
+    size_t off = strftime(buf, sizeof(buf) - 1, "[" LOG_TIMEFORMAT, &spec);
     off += (size_t) snprintf(buf + off, sizeof(buf) - (off + 1), " N:%s] ",
                              state ? state->name : "!");
     strncpy(buf + off, info, sizeof(buf) - (off + 1));
@@ -84,6 +137,42 @@ static void* unsafe_jenv(nb_state* state) {
 @() void nb_lreg (nb_state* state, short type, short priority, void (*handle) (void*)) {
     nb_istate* i = (nb_istate*) state;
     //TODO: finish
+}
+
+@() void* nb_treg(nb_state* state, int delay, int period, void* udata, void (*task) (void* udata)) {
+    nb_istate* i = (nb_istate*) state;
+    JNIEnv* e = i->env;
+    
+    jobject r = jrn_new(e, udata, task);
+
+    jint ret;
+    if (period > 0) {
+        ret = (*e)->CallIntMethod(e, nb_jsched, id_schedrepeating, i->jplugin, r, delay, period);
+    } else {
+        ret = (*e)->CallIntMethod(e, nb_jsched, id_scheddelayed, i->jplugin, r, delay);
+    }
+    CHECKEX(e, err);
+    if (ret == -1) goto bukkit_err;
+    return (void*) (uintptr_t) ret; /* lazy solution to return the integer result/handle as a pointer
+                                       won't be an issue since sizeof(jint) >= sizeof(void*) */
+ err:        /* unchecked exception */
+    nb_setex(state);
+    return NULL;
+ bukkit_err: /* according to the docs, Bukkit can apparently return -1 */
+    i->ex.type = NBEX_GENFAIL;
+    return NULL;
+}
+
+@() void nb_tcancel(nb_state* state, void* handle) {
+    nb_istate* i = (nb_istate*) state;
+    JNIEnv* e = i->env;
+    
+    (*e)->CallVoidMethod(e, nb_jsched, id_schedrm, (jint) (uintptr_t) handle);
+    CHECKEX(e, err);
+    return;
+ err:
+    nb_setex(state);
+    return;
 }
 
 /*
@@ -111,4 +200,29 @@ static void* unsafe_jenv(nb_state* state) {
 
 @() void nb_free(nb_state* state, void* ptr) {
     return free(ptr);
+}
+
+@() void nb_setex(nb_state* state) {
+    nb_istate* i = (nb_istate*) state;
+    JNIEnv* e = i->env;
+    
+    jthrowable ex = (*e)->ExceptionOccurred(e);
+    (*e)->ExceptionClear(e);
+    jclass type = (*e)->GetObjectClass(e, ex);
+    ASSERTEX(e);
+    jstring type_name = (*e)->CallObjectMethod(e, type, id_getname);
+    ASSERTEX(e);
+    jstring ex_reason = (*e)->CallObjectMethod(e, ex, id_getmessage);
+    ASSERTEX(e);
+
+    const char* cname = (*e)->GetStringUTFChars(e, type_name, NULL);
+    const char* creason = (*e)->GetStringUTFChars(e, ex_reason, NULL);
+
+    snprintf(i->exbuf, 1024, "%s: %s", cname, creason);
+
+    (*e)->ReleaseStringUTFChars(e, type_name, cname);
+    (*e)->ReleaseStringUTFChars(e, ex_reason, creason);
+        
+    i->ex.type = NBEX_INTERNAL;
+    i->ex.reason = i->exbuf;
 }

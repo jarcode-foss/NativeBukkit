@@ -11,12 +11,12 @@
 
 static ju_hook* hooks[] = {
     ju_hooks, /* needs to be resolved first, otherwise exceptions won't work */
-    pl_hooks,
-    jrn_hooks,
+    pl_hooks, jrn_hooks, nb_hooks,
     NULL
 };
 
 @() void hk_resolveall(JNIEnv* env) {
     nb_log(&nb_stub, "resolving JNI classes and members...");
     ju_resb(env, hooks);
+    nb_initsingletons(env);
 }

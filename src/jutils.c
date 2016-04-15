@@ -7,8 +7,8 @@
 #include <jni.h>
 #include <jni_md.h>
 
-#include <nbukkit_impl.h>
 #include <jutils.h>
+#include <nbukkit_impl.h>
 
 /* ju: java utils */
 
@@ -24,10 +24,14 @@ static jclass exclass;
     
     #define CHECKEX(e, b) do { if ((*e)->ExceptionCheck(e) == JNI_TRUE) { goto b; } } while (0)
     
-    #define JU_NULL { NULL, NULL, NULL, NONE }
+    #define JU_NULL { NULL, NULL, NULL, JU_NONE }
     
     typedef enum {
-        JU_CLASS, JU_METHOD, JU_STATIC_METHOD, JU_FIELD, NONE
+        JU_CLASS,
+        JU_METHOD,
+        JU_STATIC_METHOD,
+        JU_FIELD,
+        JU_NONE
     } ju_hooktype;
     
     typedef struct {
@@ -42,7 +46,7 @@ static jclass exclass;
     { "jni/NativeException", NULL, &exclass, JU_CLASS }, JU_NULL
 };
 
-/* Fatal errors should be used sparingly! They are only for when classes and members cannot be resolved, or
+/* Fatal errors should be used carefully! They are only for when classes and members cannot be resolved, or
    for handling exceptions that _should_ not be raised when calling into Java. Checked exceptions should
    always stop the current API call, and then set the error state accordingly for a plugin's nb_state */
 
@@ -62,12 +66,18 @@ static jclass exclass;
     abort();
 }
 
+#define RFATAL(env, format, ...)                \
+    do {                                        \
+        nb_logf(NULL, format, ##__VA_ARGS__);    \
+        ju_fatal(env);                          \
+    } while (0)
+
 @() jmethodID ju_resolvem(JNIEnv* env, jclass type, const char* method, const char* signature) {
     jmethodID ret = (*env)->GetMethodID(env, type, method, signature);
     CHECKEX(env, ex);
     return ret;
  ex:
-    ju_fatal(env);
+    RFATAL(env, "Could not resolve non-static method '%s' (signature: '%s')", method, signature);
 }
 
 @() jfieldID ju_resolvef(JNIEnv* env, jclass type, const char* field, const char* signature) {
@@ -75,7 +85,7 @@ static jclass exclass;
     CHECKEX(env, ex);
     return ret;
  ex:
-    ju_fatal(env);
+    RFATAL(env, "Could not resolve non-static field '%s' (signature: '%s')", field, signature);
 }
 
 @() jmethodID ju_resolvesm(JNIEnv* env, jclass type, const char* method, const char* signature) {
@@ -83,7 +93,7 @@ static jclass exclass;
     CHECKEX(env, ex);
     return ret;
  ex:
-    ju_fatal(env);
+    RFATAL(env, "Could not resolve static method '%s' (signature: '%s')", method, signature);
 }
 
 /* handle 2D array of hooks, null terminated */
@@ -104,6 +114,7 @@ static jclass exclass;
         switch (at->type) {
         case JU_CLASS:
             last = ju_classreg(env, at->name, (jclass*) at->mem);
+            nb_logf(&nb_stub, "obtained global handle for '%s' at %p", at->name, at->mem);
             break;
         case JU_STATIC_METHOD:
             *((jmethodID*) at->mem) = ju_resolvesm(env, last, at->name, at->sig);
@@ -114,7 +125,7 @@ static jclass exclass;
         case JU_FIELD:
             *((jfieldID*) at->mem) = ju_resolvef(env, last, at->name, at->sig);
             break;
-        case NONE: break;
+        case JU_NONE: break;
         }
     }
 }

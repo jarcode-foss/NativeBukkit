@@ -1,6 +1,8 @@
 
 package jni;
 
+import org.bukkit.plugin.Plugin;
+
 import ca.jarcode.nativebukkit.NativeBukkit;
 import ca.jarcode.nativebukkit.NativeBukkit.*;
 
@@ -11,12 +13,12 @@ public final class JNIPlugin {
 	private final long __handle;
 	private final String __name;
 	private long __internal = 0;
-	private final NativePlugin plugin;
+	private final Plugin __plugin;
 	
 	public JNIPlugin(long handle, NativePlugin plugin) {
 		__handle = handle;
 		__name = plugin.getName();
-		this.plugin = plugin;
+		__plugin = plugin;
 	}
 	public native void onEnable();
 	public native void onDisable();

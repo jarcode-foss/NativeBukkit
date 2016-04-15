@@ -13,7 +13,7 @@
 
 /* compatibility version; this is incremented when an introduced change breaks
    this API's binary compatibility. */
-#define NB_COMPAT_VERSION 2
+#define NB_COMPAT_VERSION 3
 
 /* macros for symbols that NativeBukkit requires for a library to be loaded */
 #define NB_ENABLE_SYM nb_enable_hook
@@ -29,6 +29,15 @@
 #define NB_DISABLE_DEF() NB_SYM void NB_DISABLE_SYM (void)
 #define NB_LOAD_DEF(arg, api) NB_SYM void NB_LOAD_SYM (nb_state* arg, nb_api* api)
 
+#define NBEX_INTERNAL 4  /* internal error or exception in the server, reason is set */
+#define NBEX_GENFAIL 3   /* generic failure, reason is not set */
+#define NBEX_BADARGS 2   /* bad arguments, reason is not set */
+#define NBEX_UNKNOWN 1   /* unknown error, reason is not set */
+
+#define NB_COMPLAIN(state, api)                                         \
+    api->logf(state, "ERROR: %s", state->ex.type == NBEX_INTERNAL ? state->ex.reason \
+              : "bad arguments or nonstandard error")
+
 /* exception state */
 typedef struct {
     int type;
@@ -37,22 +46,24 @@ typedef struct {
 
 /* plugin-specific state */
 typedef struct {
-#define NB_STATE_MEMBERS                        \
-    const char *const name;                     \
+#define NB_STATE_MEMBERS                  \
+    const char const* name;               \
     nb_ex ex;
     NB_STATE_MEMBERS
 } nb_state;
 
+struct nb_vtsender;
+
 /* interface for anything that can send commands, recieve messages, and have permissions */
 typedef struct {
     void* impl;       /* implementation */
-    nb_vtsender* vt;  /* vtable */
+    struct nb_vtsender* vt;  /* vtable */
 } nb_sender;
 
-typedef struct {
+typedef struct nb_vtsender {
     void         (*send)    (nb_sender self, const char* cmd);
-    const char*  (*name)    (nb_sender self, void);
-    bool         (*hasperm) (nb_sender self, const char* perm);
+    const char*  (*name)    (nb_sender self);
+    int          (*hasperm) (nb_sender self, const char* perm);
 } nb_vtsender;
 
 /* function typedef for handling commands; implementations of this function should not use
@@ -70,7 +81,7 @@ typedef struct {
     void* (*realloc)  (nb_state* state, void* ptr, size_t size);
     void  (*free)     (nb_state* state, void* ptr);
     
-    /* the following functions can set state->ex if a non-fatal exception occurred */
+    /* the following functions can set state->ex if a non-fatal error occurred */
     
     /* register a command */
     void  (*cmdreg)   (nb_state* state, const char* cmd, nb_cmdhandler handler);
@@ -90,6 +101,7 @@ typedef struct {
         /* function to obtain jobject (not a pointer, cast straight to
            jobject), as a Runnable instance */
         void* (*java_runnable) (nb_state* state, void* udata, void (*task) (void* udata));
+        void  (*java_setex)    (nb_state* state);
     } unsafe;
 } nb_api;
 
