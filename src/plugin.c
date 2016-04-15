@@ -94,18 +94,22 @@ JNIEXPORT JNICALL void Java_jni_JNIPlugin_onLoad(JNIEnv* e, jobject this) {
     
     return;
  dlsym_fail:
+    nb_log(NULL, "\n\n"
+           "Symbol resolution failed when attempting to load a plugin. This\n"
+           "normally means the author forgot to define the required plugin\n"
+           "hooks in his code.\n");
     ju_throwf(e, "dlsym() failed (%p): %s", handle, err);
     return;
  version_mismatch:
     if (compat_version < NB_COMPAT_VERSION) {
         nb_log(NULL, "\n\n"
-               "A plugin failed to load because it was compiled with an older\n"
-               "version of the NativeBukkit API. Please update the plugin or\n"
-               "report the issue to the author.\n");
+               "A native plugin failed to load because it was compiled with an\n"
+               "older version of the NativeBukkit API. Please update the plugin\n"
+               "or report the issue to the author.\n");
     } else {
         nb_log(NULL, "\n\n"
-               "A plugin was compiled with a newer version of the NativeBukkit API,\n"
-               "this likely means you need to update NativeBukkit.\n");
+               "A native plugin was compiled with a newer version of the NativeBukkit\n"
+               "API, this likely means you need to update NativeBukkit.\n");
     }
     ju_throwf(e, "failed to load plugin '%s': bad API compatibility version (got %d, expected %d)",
               self->name, compat_version, NB_COMPAT_VERSION);
