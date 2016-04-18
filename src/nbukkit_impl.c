@@ -42,6 +42,9 @@ static void* unsafe_jrunnable(nb_state* state, void* udata, void (*ptr) (void* u
 
 @(extern) jclass nb_jbukkit;        /* org.bukkit.Bukkit */
 static jmethodID id_getsched;       /* static Bukkit#getScheduler() */
+static jmethodID id_getsname;       /* static Bukkit#getName() */
+static jmethodID id_getsversion;    /* static Bukkit#getVersion() */
+static jmethodID id_getsbversion;   /* static Bukkit#getBukkitVersion() */
 
 static jclass class_jsched;         /* BukkitScheduler singleton */
 static jmethodID id_schedrepeating; /* BukkitScheduler#scheduleSyncRepeatingTask(...) */
@@ -56,6 +59,9 @@ static jmethodID id_getmessage;     /* Throwable#getMessage() */
 @(extern) ju_hook nb_hooks[] = {
     { "org/bukkit/Bukkit", NULL, &nb_jbukkit, JU_CLASS },
     { "getScheduler", "()Lorg/bukkit/scheduler/BukkitScheduler;", &id_getsched, JU_STATIC_METHOD },
+    { "getName", "()Ljava/lang/String;", &id_getsname, JU_STATIC_METHOD },
+    { "getVersion", "()Ljava/lang/String;", &id_getsversion, JU_STATIC_METHOD },
+    { "getBukkitVersion", "()Ljava/lang/String;", &id_getsbversion, JU_STATIC_METHOD },
     
     { "org/bukkit/scheduler/BukkitScheduler", "J", &class_jsched, JU_CLASS },
     { "scheduleSyncRepeatingTask",
@@ -73,14 +79,25 @@ static jmethodID id_getmessage;     /* Throwable#getMessage() */
     JU_NULL
 };
 
+static char bukkit_impl[128];
+static char bukkit_ver[128];
+static char bukkit_info[128];
+
+/* there is only ever one version that Bukkit will report to us */
+static char* bukkit_versions[] = { bukkit_ver, NULL };
+
 @(extern) nb_state nb_stub = { .name = "loader" };
 
 @(extern) nb_api nb_global_api = {
+    .impl = bukkit_impl, .impl_versions = bukkit_versions, .impl_extra = bukkit_info,
+
+    .unit = 50000000, .absolute_units = false, /* 50Hz tickrate, tied to server tickrate */
+    
     .logf = &nb_logf, .log = &nb_log,
     
     .alloc = &nb_alloc, .realloc = &nb_realloc, .free = &nb_free,
     
-    .treg = &nb_treg, .tcancel = &nb_tcancel,
+    .lreg = &nb_lreg, .treg = &nb_treg, .tcancel = &nb_tcancel,
     
     .unsafe = {
         .java_env = &unsafe_jenv,
@@ -95,6 +112,30 @@ static jmethodID id_getmessage;     /* Throwable#getMessage() */
 @() void nb_initsingletons(JNIEnv* e) {
     nb_jsched = (*e)->NewGlobalRef(e, (*e)->CallStaticObjectMethod(e, nb_jbukkit, id_getsched));
     ASSERTEX(e);
+    jstring jimpl = (*e)->CallStaticObjectMethod(e, nb_jbukkit, id_getsname);
+    ASSERTEX(e);
+    jstring jver = (*e)->CallStaticObjectMethod(e, nb_jbukkit, id_getsversion);
+    ASSERTEX(e);
+    jstring jbver = (*e)->CallStaticObjectMethod(e, nb_jbukkit, id_getsbversion);
+    ASSERTEX(e);
+    
+    if (jimpl) {
+        const char* impl = (*e)->GetStringUTFChars(e, jimpl, NULL);
+        strncpy(bukkit_impl, impl, 128);
+        (*e)->ReleaseStringUTFChars(e, jimpl, impl);
+    } else nb_global_api.impl = "NULL";
+    
+    if (jver) {
+        const char* ver = (*e)->GetStringUTFChars(e, jver, NULL);
+        strncpy(bukkit_ver, ver, 128);
+        (*e)->ReleaseStringUTFChars(e, jver, ver);
+    } else nb_global_api.impl_version = "NULL";
+               
+    if (jbver) {
+        const char* bver = (*e)->GetStringUTFChars(e, jbver, NULL);
+        strncpy(bukkit_info, bver, 128);
+        (*e)->ReleaseStringUTFChars(e, jbver, bver);
+    } else bukkit_versions[0] = "NULL";
 }
 
 @() void nb_logf(nb_state* state, const char* format, ...) {
@@ -128,13 +169,7 @@ static jmethodID id_getmessage;     /* Throwable#getMessage() */
     fputc('\n', stdout ? stdout : stderr);
 }
 
-
-@() void nb_cmdreg(nb_state* state, const char* cmd, nb_cmdhandler handler) {
-    nb_istate* i = (nb_istate*) state;
-    //TODO: finish
-}
-
-@() void nb_lreg (nb_state* state, short type, short priority, void (*handle) (void*)) {
+@() void nb_lreg(nb_state* state, short type, short priority, void (*handle) (void*)) {
     nb_istate* i = (nb_istate*) state;
     //TODO: finish
 }
@@ -167,7 +202,7 @@ static jmethodID id_getmessage;     /* Throwable#getMessage() */
     nb_istate* i = (nb_istate*) state;
     JNIEnv* e = i->env;
     
-    (*e)->CallVoidMethod(e, nb_jsched, id_schedrm, (jint) (uintptr_t) handle);
+    (*e)->CallVoidMethod(e, nb_jsched, id_schedrm, (jint) (uinxtptr_t) handle);
     CHECKEX(e, err);
     return;
  err:

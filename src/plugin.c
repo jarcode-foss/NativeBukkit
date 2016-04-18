@@ -119,22 +119,32 @@ JNIEXPORT JNICALL void Java_jni_JNIPlugin_onLoad(JNIEnv* e, jobject this) {
 JNIEXPORT JNICALL void Java_jni_JNIPlugin_onEnable(JNIEnv* e, jobject this) {
     nb_istate* self = (nb_istate*) (intptr_t) (*e)->GetLongField(e, this, id_internal);
     ASSERTEX(e);
-    self->enable();
+    if (self) {
+        self->enable();
+    } else ju_throw(e, "__internal is null");
 }
 
 JNIEXPORT JNICALL void Java_jni_JNIPlugin_onDisable(JNIEnv* e, jobject this) {
     nb_istate* self = (nb_istate*) (intptr_t) (*e)->GetLongField(e, this, id_internal);
     ASSERTEX(e);
-    self->disable();
+    if (self) {
+        self->disable();
+    } else ju_throw(e, "__internal is null");
 }
 
 JNIEXPORT JNICALL void Java_jni_JNIPlugin_close(JNIEnv* e, jobject this) {
     nb_istate* self = (nb_istate*) (intptr_t) (*e)->GetLongField(e, this, id_internal);
+    ASSERTEX(e);
     void* handle = (void*) (intptr_t) (*e)->GetLongField(e, this, id_handle);
     ASSERTEX(e);
-    if (dlclose(handle)) {
-        ju_throwf(e, "dlclose() failed (%p): %s:", handle, dlerror());
-        return;
+    if (handle) {
+        if (dlclose(handle)) {
+            ju_throwf(e, "dlclose() failed (%p): %s:", handle, dlerror());
+            return;
+        } else {
+            (*e)->SetLongField(e, this, id_handle, (jlong) 0);
+            ASSERTEX(e);
+        }
     }
     if (self) {
         free(self);

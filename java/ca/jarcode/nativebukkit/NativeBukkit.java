@@ -86,10 +86,13 @@ public class NativeBukkit extends JavaPlugin {
 		public Plugin loadPlugin(File file) throws InvalidPluginException {
 			Bukkit.getLogger().info(String.format("Loading native plugin '%s'...", file.getName()));
 			try {
-				return new NativePlugin(file, this, JNIPlugin.open(file.getAbsolutePath()));
+				NativePlugin p = new NativePlugin(file, this, JNIPlugin.open(file.getAbsolutePath()));
+				Bukkit.getLogger().info(String.format("Loaded '%s'.", file.getName()));
+				return p;
 			} catch (NativeException e) {
 				throw new InvalidPluginException(e);
 			}
+			
 		}
 	}
 	
@@ -104,7 +107,7 @@ public class NativeBukkit extends JavaPlugin {
 			this.lib = lib;
 			this.loader = loader;
 			plugin = new JNIPlugin(handle, this);
-			plugin.onLoad();
+			onLoad();
 		}
 		public FileConfiguration getConfig() { return null; } /* ignore */
 		public com.avaje.ebean.EbeanServer getDatabase() { return null; } /* stub */
@@ -126,21 +129,20 @@ public class NativeBukkit extends JavaPlugin {
 		public void onDisable() {
 			if (enabled) {
 				Bukkit.getLogger().info(String.format("Disabling '%s'...", getName()));
-				plugin.onDisable();
 				enabled = false;
+				plugin.onDisable();
 				Bukkit.getLogger().info(String.format("'%s' has been disabled.", getName()));
 			}
 		}
 		public void onEnable() {
 			if (!enabled) {
 				Bukkit.getLogger().info(String.format("Enabling '%s'...", getName()));
-				plugin.onEnable();
 				enabled = true;
+				plugin.onEnable();
 				Bukkit.getLogger().info(String.format("'%s' has been enabled.", getName()));
 			}
 		}
 		public void onLoad() {
-			Bukkit.getLogger().info(String.format("Loaded '%s'.", getName()));
 			plugin.onLoad();
 		}
 		public void reloadConfig() {} /* ignore */
